@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Written by Harry Vasanth (harry.vasanth@m-iti.org)
+  ~ Copyright (c) 2017.
+  ~ Please acknowledge the creator by giving him/her credit for the work
+  -->
+
+<resources>
+
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+    </style>
+
+    <color name="colorPrimary">#263238</color>
+    <color name="colorPrimaryDark">#263238</color>
+    <color name="colorAccent">#56d4c4</color>
+    <color name="colorBg">#37474F</color>
+    <color name="coloBgh">#3c4057</color>
+    <color name="colorText">#a1a5bd</color>
+    <color name="colorLite">#f8fcfc</color>
+    <string name="app_name">BWATCH</string>
+    <string name="bwatch.system">© 2017 BWATCH \n feedback: harry.vasanth@m-iti.org </string>
+    <string name="bwatch.audio">com.harry.audiologger</string>
+    <string name="bwatch.default">1</string>
+</resources>
