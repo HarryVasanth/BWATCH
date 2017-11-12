@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Written by Harry Vasanth (harry.vasanth@m-iti.org)
+  ~ Copyright (c) 2017.
+  ~ Please acknowledge the creator by giving him/her credit for the work
+  -->
+
+<resources>
+    <string name="app_name">BWATCH</string>
+    <item name="heart" type="id" />
+</resources>
