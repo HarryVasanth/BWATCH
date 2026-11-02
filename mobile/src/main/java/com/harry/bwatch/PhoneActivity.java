@@ -1,174 +1,173 @@
-/*
- * Written by Harry Vasanth (harry.vasanth@m-iti.org)
- * Copyright (c) 2017.
- * Please acknowledge the creator by giving him/her credit for the work
- */
-
 package com.harry.bwatch;
 
-import android.app.Activity;
+import android.Manifest;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
-import android.graphics.Color;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-import com.harry.bwatch.services.WearListenerService;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Timer;
-import java.util.TimerTask;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import com.harry.bwatch.data.SensorRepository;
+import com.harry.bwatch.data.SensorSnapshot;
 
-public class PhoneActivity extends Activity implements View.OnClickListener {
+/** Phone-side dashboard. Recording itself lives in {@link RecordingService}. */
+public class PhoneActivity extends AppCompatActivity {
 
-  TextView txtHRate, txtGyro, txtAcc, txtWearStatus, txtDIP;
-  ImageView imgWear;
-  WearListenerService wearListenerService = new WearListenerService();
-  Timer udpTimer;
-  ParseData parseData;
-  int frequency = Integer.parseInt(getString(R.string.bwatch_default));
-  String filename =
-    "bWatch_" + new SimpleDateFormat("yyyyMMdd_HHmm'.csv'").format(new Date());
+  private static final int REQUEST_NOTIFICATIONS = 1;
+  private static final long UI_REFRESH_MS = 250L;
+  private static final long STALE_AFTER_MS = 5_000L;
 
-  public PhoneActivity() {}
+  private final Handler handler = new Handler(Looper.getMainLooper());
+  private final SensorRepository repository = SensorRepository.getInstance();
+
+  private TextView txtHRate;
+  private TextView txtGyro;
+  private TextView txtAcc;
+  private TextView txtWearStatus;
+  private ImageView imgWear;
+  private boolean verbose;
+
+  private final Runnable refresh = new Runnable() {
+    @Override
+    public void run() {
+      render(repository.snapshot());
+      handler.postDelayed(this, UI_REFRESH_MS);
+    }
+  };
 
   @Override
-  public void onCreate(Bundle savedInstanceState) {
+  protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_phone);
 
-    txtWearStatus = (TextView) findViewById(R.id.txtWearStatus);
-    imgWear = (ImageView) findViewById(R.id.imgWear);
+    txtWearStatus = findViewById(R.id.txtWearStatus);
+    imgWear = findViewById(R.id.imgWear);
+    txtHRate = findViewById(R.id.txtHRate);
+    txtGyro = findViewById(R.id.txtGyro);
+    txtAcc = findViewById(R.id.txtAcc);
 
-    txtHRate = (TextView) findViewById(R.id.txtHRate);
-    txtGyro = (TextView) findViewById(R.id.txtGyro);
-    txtAcc = (TextView) findViewById(R.id.txtAcc);
-    txtDIP = (TextView) findViewById(R.id.txtDIP);
-
-    udpTimer = new Timer();
-    parseData = new ParseData();
-    udpTimer.scheduleAtFixedRate(parseData, 0, 1000 / frequency);
+    requestNotificationPermission();
+    ContextCompat.startForegroundService(this, RecordingService.startIntent(this));
   }
 
   @Override
-  public void onClick(View v) {}
+  protected void onResume() {
+    super.onResume();
+    handler.removeCallbacks(refresh);
+    handler.post(refresh);
+  }
 
   @Override
-  public void onResume() {
-    super.onResume();
+  protected void onPause() {
+    super.onPause();
+    handler.removeCallbacks(refresh);
+  }
+
+  @Override
+  protected void onDestroy() {
+    handler.removeCallbacks(refresh);
+    super.onDestroy();
+  }
+
+  private void render(SensorSnapshot snapshot) {
+    long now = System.currentTimeMillis();
+    if (!snapshot.isFresh(now, STALE_AFTER_MS)) {
+      imgWear.setImageResource(R.drawable.hr_off);
+      txtWearStatus.setText(R.string.status_disconnected);
+      txtWearStatus.setTextColor(
+        ContextCompat.getColor(this, R.color.status_offline)
+      );
+    } else if (
+      snapshot.getHeartRate() <= 0 ||
+      !snapshot.hasFreshHeartRate(now, STALE_AFTER_MS)
+    ) {
+      imgWear.setImageResource(R.drawable.hr_off);
+      txtWearStatus.setText(R.string.status_no_heart_rate);
+      txtWearStatus.setTextColor(
+        ContextCompat.getColor(this, R.color.status_warning)
+      );
+    } else {
+      imgWear.setImageResource(R.drawable.hr_on);
+      txtWearStatus.setText(R.string.status_connected);
+      txtWearStatus.setTextColor(
+        ContextCompat.getColor(this, R.color.status_online)
+      );
+    }
+
+    txtHRate.setText(getString(R.string.value_hr, snapshot.getHeartRate()));
+    txtGyro.setText(
+      getString(
+        R.string.value_gyro,
+        snapshot.getGyroX(),
+        snapshot.getGyroY(),
+        snapshot.getGyroZ()
+      )
+    );
+    txtAcc.setText(
+      getString(
+        R.string.value_acc,
+        snapshot.getAccX(),
+        snapshot.getAccY(),
+        snapshot.getAccZ()
+      )
+    );
   }
 
   public void btnExit(View view) {
-    this.finish();
-    System.exit(0);
+    stopService(RecordingService.stopIntent(this));
+    finish();
   }
 
   public void btnInfo(View view) {
     Toast
-      .makeText(
-        getApplicationContext(),
-        getString(R.string.bwatch_system),
-        Toast.LENGTH_LONG
-      )
+      .makeText(getApplicationContext(), R.string.info_text, Toast.LENGTH_LONG)
       .show();
   }
 
   public void btnVerbose(View view) {
-    if (txtHRate.getVisibility() != txtWearStatus.getVisibility()) {
-      txtAcc.setVisibility(View.VISIBLE);
-      txtGyro.setVisibility(View.VISIBLE);
-      txtHRate.setVisibility(View.VISIBLE);
-    } else {
-      txtAcc.setVisibility(View.INVISIBLE);
-      txtGyro.setVisibility(View.INVISIBLE);
-      txtHRate.setVisibility(View.INVISIBLE);
-    }
+    verbose = !verbose;
+    int visibility = verbose ? View.VISIBLE : View.INVISIBLE;
+    txtHRate.setVisibility(visibility);
+    txtGyro.setVisibility(visibility);
+    txtAcc.setVisibility(visibility);
   }
 
   public void btnAudio(View view) {
-    Intent launchIntent = getPackageManager()
-      .getLaunchIntentForPackage(getString(R.string.bwatch_audio));
-    if (launchIntent != null) {
-      startActivity(launchIntent);
-    }
-  }
-
-  public void writeData(String wearData) {
-    File sdcard = Environment.getExternalStorageDirectory();
-    File dir = new File(
-      Environment.getExternalStorageDirectory().getAbsolutePath() +
-      "/BWATCH_data"
-    );
-
-    dir.mkdir();
-    String timeStamp = new SimpleDateFormat("yyyy-MM-dd,HH:mm:ss.SSS")
-      .format(new Date());
-
-    File sessionFile = new File(dir, filename);
-    if (!sessionFile.exists()) {
-      try {
-        sessionFile.createNewFile();
-        BufferedWriter buf = new BufferedWriter(
-          new FileWriter(sessionFile, true)
-        );
-        buf.append("date,time,hr,gyro_x,gyro_y,gyro_z,acc_x,acc_y,acc_z");
-        buf.newLine();
-        buf.close();
-      } catch (IOException e) {
-        e.printStackTrace();
-      } finally {}
+    String packageName = getString(R.string.audio_logger_package);
+    Intent launchIntent = getPackageManager().getLaunchIntentForPackage(packageName);
+    if (launchIntent == null) {
+      Toast.makeText(this, R.string.audio_logger_missing, Toast.LENGTH_SHORT).show();
+      return;
     }
     try {
-      BufferedWriter buf = new BufferedWriter(
-        new FileWriter(sessionFile, true)
-      );
-      buf.append(timeStamp + "," + wearData);
-      buf.newLine();
-      buf.close();
-    } catch (IOException e) {
-      e.printStackTrace();
-    } finally {}
+      startActivity(launchIntent);
+    } catch (ActivityNotFoundException exception) {
+      Toast.makeText(this, R.string.audio_logger_missing, Toast.LENGTH_SHORT).show();
+    }
   }
 
-  class ParseData extends TimerTask {
-
-    @Override
-    public void run() {
-      runOnUiThread(
-        new Runnable() {
-          @Override
-          public void run() {
-            txtHRate.setText(wearListenerService.gethRate());
-            txtGyro.setText(wearListenerService.getGyroXYZ());
-            txtAcc.setText(wearListenerService.getAccXYZ());
-
-            if (wearListenerService.gethRate().equals("00")) {
-              imgWear.setImageResource(R.drawable.hr_off);
-              txtWearStatus.setText("Disconnected");
-              txtWearStatus.setTextColor(Color.parseColor("#f33030"));
-            } else {
-              imgWear.setImageResource(R.drawable.hr_on);
-              txtWearStatus.setText("Connected");
-              txtWearStatus.setTextColor(Color.parseColor("#82dd46"));
-            }
-          }
-        }
+  private void requestNotificationPermission() {
+    if (
+      Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+      ContextCompat.checkSelfPermission(
+        this,
+        Manifest.permission.POST_NOTIFICATIONS
+      ) !=
+      PackageManager.PERMISSION_GRANTED
+    ) {
+      ActivityCompat.requestPermissions(
+        this,
+        new String[] { Manifest.permission.POST_NOTIFICATIONS },
+        REQUEST_NOTIFICATIONS
       );
-      if (txtWearStatus.getText().toString().equals("Connected")) {
-        writeData(
-          wearListenerService.gethRate() +
-          "," +
-          wearListenerService.getGyroXYZ() +
-          "," +
-          wearListenerService.getAccXYZ()
-        );
-      }
     }
   }
 }

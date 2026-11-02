@@ -1,154 +1,131 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  ~ Written by Harry Vasanth (harry.vasanth@m-iti.org)
-  ~ Copyright (c) 2017.
-  ~ Please acknowledge the creator by giving him/her credit for the work
-  -->
-
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:layout_centerHorizontal="true"
-    android:background="@color/colorPrimary"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:id="@+id/header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/txtWearStatus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/status_disconnected"
+            android:textColor="@color/status_offline"
+            android:textSize="20sp" />
+
+        <ImageView
+            android:id="@+id/imgVerbose"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="@string/cd_toggle_verbose"
+            android:onClick="btnVerbose"
+            android:padding="12dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/config" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/imgWear"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_below="@id/header"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="4dp"
+        android:importantForAccessibility="no"
+        android:scaleType="centerInside"
+        android:src="@drawable/hr_off" />
 
     <ImageView
         android:id="@+id/btnAudioLog"
         android:layout_width="78dp"
         android:layout_height="78dp"
-        android:layout_centerHorizontal="true"
-        android:layout_centerVertical="true"
+        android:layout_centerInParent="true"
         android:clickable="true"
+        android:focusable="true"
+        android:contentDescription="@string/cd_audio_logger"
         android:onClick="btnAudio"
-        android:scaleType="fitXY"
+        android:scaleType="centerInside"
         android:src="@drawable/ic_audiolog" />
-
-    <ImageView
-        android:id="@+id/imgWear"
-        android:layout_width="32sp"
-        android:layout_height="32sp"
-
-        android:layout_below="@+id/txtWearStatus"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="12dp"
-        android:scaleType="fitXY"
-        android:src="@drawable/hr_off" />
-
-    <TextView
-        android:id="@+id/txtWearStatus"
-        style="@style/TextAppearance.AppCompat.Medium"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="33dp"
-        android:autoText="false"
-        android:gravity="center_vertical"
-        android:text="Disconnected"
-        android:textAlignment="center"
-        android:textAppearance="@style/TextAppearance.AppCompat.Large"
-        android:textColor="@android:color/holo_red_dark" />
-
-
-
-    <ImageView
-        android:id="@+id/imgExit"
-        android:layout_width="32sp"
-        android:layout_height="32sp"
-        android:layout_alignParentBottom="true"
-        android:layout_alignStart="@+id/imgWear"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="30dp"
-        android:clickable="true"
-        android:onClick="btnExit"
-        android:scaleType="fitXY"
-        android:src="@drawable/exit" />
 
     <TextView
         android:id="@+id/txtHRate"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_above="@+id/txtGyro"
-        android:layout_alignEnd="@+id/txtGyro"
-        android:layout_alignStart="@+id/txtDIP"
-        android:layout_marginBottom="11dp"
-        android:gravity="center_vertical"
-        android:text="HR: 00"
-        android:textColor="?android:attr/colorMultiSelectHighlight"
-        android:visibility="invisible" />
-
-    <TextView
-        android:id="@+id/txtDIP"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@+id/txtHRate"
-        android:layout_alignEnd="@+id/txtGyro"
-        android:layout_alignStart="@+id/txtDIPLabel"
-        android:text="127.0.0.1:11111"
-        android:textAlignment="center"
-        android:textAllCaps="false"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="@android:color/holo_orange_dark"
-        android:visibility="invisible" />
-
-    <ImageView
-        android:id="@+id/imgLogo"
-        android:layout_width="32sp"
-        android:layout_height="32sp"
-        android:layout_below="@+id/txtAcc"
-        android:layout_toStartOf="@+id/imgVerbose"
-        android:clickable="true"
-        android:longClickable="false"
-        android:onClick="btnInfo"
-        android:scaleType="fitXY"
-        android:src="@drawable/bw_plain" />
-
-    <TextView
-        android:id="@+id/txtDIPLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@+id/txtDIP"
-        android:layout_alignEnd="@+id/txtGyro"
-        android:layout_alignStart="@+id/txtGyro"
-        android:text="UDP Destination:"
-        android:textAlignment="center"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="@android:color/holo_orange_dark"
+        android:layout_above="@id/txtGyro"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="8dp"
+        android:text="@string/value_hr"
+        android:textColor="@color/colorAccent"
+        android:textSize="16sp"
         android:visibility="invisible" />
 
     <TextView
         android:id="@+id/txtGyro"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_above="@+id/txtAcc"
-        android:layout_alignStart="@+id/txtAcc"
+        android:layout_above="@id/txtAcc"
         android:layout_centerHorizontal="true"
-        android:layout_marginBottom="11dp"
-        android:text="Gyro: XXX, YYY, ZZZ"
-        android:textAlignment="center"
-        android:textColor="@android:color/holo_orange_dark"
+        android:layout_marginBottom="8dp"
+        android:text="@string/value_gyro"
+        android:textColor="@color/text_secondary"
+        android:textSize="14sp"
         android:visibility="invisible" />
 
     <TextView
         android:id="@+id/txtAcc"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_above="@+id/imgExit"
+        android:layout_above="@id/imgExit"
         android:layout_centerHorizontal="true"
-        android:layout_marginBottom="13dp"
-        android:text="Acc: XXX, YYY, ZZZ"
-        android:textAlignment="center"
-        android:textColor="@android:color/holo_orange_dark"
+        android:layout_marginBottom="24dp"
+        android:text="@string/value_acc"
+        android:textColor="@color/text_secondary"
+        android:textSize="14sp"
         android:visibility="invisible" />
 
     <ImageView
-        android:id="@+id/imgVerbose"
-        android:layout_width="16sp"
-        android:layout_height="16sp"
-        android:layout_alignParentEnd="true"
-        android:layout_alignParentTop="true"
+        android:id="@+id/imgLogo"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true"
+        android:layout_margin="8dp"
         android:clickable="true"
-        android:onClick="btnVerbose" />
+        android:focusable="true"
+        android:contentDescription="@string/cd_info"
+        android:onClick="btnInfo"
+        android:padding="8dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/bw_plain" />
 
+    <ImageView
+        android:id="@+id/imgExit"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:layout_margin="8dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:contentDescription="@string/cd_exit"
+        android:onClick="btnExit"
+        android:padding="12dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/exit" />
 
 </RelativeLayout>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#263238</color>
+    <color name="colorPrimaryDark">#263238</color>
+    <color name="colorAccent">#56D4C4</color>
+    <color name="colorBg">#37474F</color>
+    <color name="text_secondary">#A1A5BD</color>
+    <color name="status_online">#82DD46</color>
+    <color name="status_offline">#F33030</color>
+    <color name="status_warning">#FFB300</color>
+</resources>

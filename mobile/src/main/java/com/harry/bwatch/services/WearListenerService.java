@@ -1,49 +1,37 @@
-/*
- * Written by Harry Vasanth (harry.vasanth@m-iti.org)
- * Copyright (c) 2017.
- * Please acknowledge the creator by giving him/her credit for the work
- */
-
 package com.harry.bwatch.services;
 
+import android.util.Log;
 import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.WearableListenerService;
+import com.harry.bwatch.data.SensorPayload;
+import com.harry.bwatch.data.SensorRepository;
+import com.harry.bwatch.data.SensorUpdate;
+import java.nio.charset.StandardCharsets;
 
+/**
+ * Receives sensor messages from the watch and republishes them in the process
+ * wide {@link SensorRepository}.
+ */
 public class WearListenerService extends WearableListenerService {
 
-  public static String hRate = "00";
-  public static String gyroXYZ = "XXX, YYY, ZZZ";
-  public static String accXYZ = "XXX, YYY, ZZZ";
-
-  public static String gethRate() {
-    return hRate;
-  }
-
-  public static String getGyroXYZ() {
-    return gyroXYZ;
-  }
-
-  public static String getAccXYZ() {
-    return accXYZ;
-  }
+  private static final String TAG = "WearListenerService";
 
   @Override
   public void onMessageReceived(MessageEvent messageEvent) {
-    super.onMessageReceived(messageEvent);
-    String event = messageEvent.getPath();
-    String[] wearMessage = event.split("--");
-    if (wearMessage[0].toString().equals("HR")) {
-      hRate = wearMessage[1].toString();
+    if (messageEvent == null || !SensorPayload.PATH.equals(messageEvent.getPath())) {
+      return;
     }
-    if (wearMessage[0].toString().equals("GYRO")) {
-      gyroXYZ = wearMessage[1].toString();
+
+    byte[] data = messageEvent.getData();
+    String payload = data == null
+      ? null
+      : new String(data, StandardCharsets.UTF_8);
+    SensorUpdate update = SensorPayload.parse(payload);
+    if (update == null) {
+      Log.w(TAG, "Ignoring malformed sensor payload");
+      return;
     }
-    if (wearMessage[0].toString().equals("ACC")) {
-      accXYZ = wearMessage[1].toString();
-    }
-    if (wearMessage[0].equals("None")) {
-      hRate = "00";
-      gyroXYZ = "XXX, YYY, ZZZ";
-    }
+
+    SensorRepository.getInstance().apply(update, System.currentTimeMillis());
   }
 }

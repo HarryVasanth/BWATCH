@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BWATCH</string>
+    <string name="info_text">© 2017–2026 BWATCH\nfeedback: harry.vasanth@m-iti.org</string>
+    <string name="audio_logger_package">com.harry.audiologger</string>
+
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_no_heart_rate">No heart rate</string>
+
+    <string name="value_hr">HR: %1$d</string>
+    <string name="value_gyro">Gyro: %1$.2f, %2$.2f, %3$.2f</string>
+    <string name="value_acc">Acc: %1$.2f, %2$.2f, %3$.2f</string>
+
+    <string name="cd_audio_logger">Open the audio logger</string>
+    <string name="cd_exit">Stop recording and exit</string>
+    <string name="cd_info">About BWATCH</string>
+    <string name="cd_toggle_verbose">Show or hide sensor values</string>
+
+    <string name="notification_channel">Session recording</string>
+    <string name="notification_channel_description">Keeps the sensor recorder running while the screen is off</string>
+    <string name="notification_title">BWATCH recording</string>
+    <string name="notification_starting">Starting session…</string>
+    <string name="notification_recording">Recording to %1$s</string>
+    <string name="notification_stop">Stop</string>
+    <string name="audio_logger_missing">Audio logger is not installed</string>
+</resources>
