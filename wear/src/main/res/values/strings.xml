@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BWATCH</string>
+    <string name="stop_recording">STOP</string>
+    <string name="heart_rate_value">Heart rate: %1$d bpm</string>
+    <string name="sensor_permission_required">Body sensor permission is required</string>
+    <string name="sensors_unavailable">This watch has no usable sensors</string>
+    <string name="heart_rate_unavailable">Heart rate sensor unavailable</string>
+</resources>

@@ -1,135 +1,213 @@
-/*
- * Written by Harry Vasanth (harry.vasanth@m-iti.org)
- * Copyright (c) 2017.
- * Please acknowledge the creator by giving him/her credit for the work
- */
-
 package com.harry.bwatch;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
-import android.support.wearable.view.WatchViewStub;
+import android.os.SystemClock;
 import android.view.View;
 import android.widget.TextView;
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.wearable.MessageApi;
-import com.google.android.gms.wearable.Node;
-import com.google.android.gms.wearable.NodeApi;
-import com.google.android.gms.wearable.Wearable;
+import java.util.Locale;
 
-public class WearActivity
-  extends Activity
-  implements
-    SensorEventListener,
-    GoogleApiClient.ConnectionCallbacks,
-    GoogleApiClient.OnConnectionFailedListener {
+/**
+ * Streams heart rate, gyroscope and accelerometer samples to the phone.
+ *
+ * <p>All payloads are formatted with {@link Locale#US}; a locale with a comma
+ * decimal separator would otherwise corrupt the CSV protocol.
+ */
+public class WearActivity extends Activity implements SensorEventListener {
 
-  public static String SensorType = "HR";
-  public TextView mTextView;
-  Node mNode;
-  GoogleApiClient mGoogleApiClient;
+  private static final int REQUEST_BODY_SENSORS = 1;
+  private static final float GRAVITY_ALPHA = 0.8f;
+  // The phone stores one sample per second; forwarding at sensor rate would
+  // spend battery and Bluetooth bandwidth without improving the CSV.
+  private static final long MIN_TRANSMIT_INTERVAL_MS = 200L;
 
-  SensorManager mSensorManager;
+  private final float[] gravity = new float[3];
+  private long lastGyroSentMs;
+  private long lastAccelSentMs;
 
-  Sensor mHeartRateSensor;
-  Sensor mGyroscopeSensor;
-  Sensor mAccelerometerSensor;
-  boolean mResolvingError = false;
+  private SensorManager sensorManager;
+  private Sensor heartRateSensor;
+  private Sensor gyroscopeSensor;
+  private Sensor accelerometerSensor;
+  private TextView statusView;
+  private MessageSender sender;
+  private boolean sensorsRegistered;
+  private boolean permissionRequested;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_wear);
-    mGoogleApiClient =
-      new GoogleApiClient.Builder(this)
-        .addApi(Wearable.API)
-        .addConnectionCallbacks(this)
-        .addOnConnectionFailedListener(this)
-        .build();
-
-    final WatchViewStub stub = (WatchViewStub) findViewById(
-      R.id.watch_view_stub
-    );
-    stub.setOnLayoutInflatedListener(
-      new WatchViewStub.OnLayoutInflatedListener() {
-        //
-        //
-        //
-        @Override
-        public void onLayoutInflated(WatchViewStub stub) {
-          mTextView = (TextView) stub.findViewById(R.id.textHR);
-          mTextView.setText(R.string.app_name);
-          getHR();
-        }
-      }
-    );
+    statusView = findViewById(R.id.textHR);
+    sender = new MessageSender(this);
   }
 
-  public void getHR() {
-    mSensorManager = ((SensorManager) getSystemService(SENSOR_SERVICE));
+  @Override
+  protected void onResume() {
+    super.onResume();
+    sender.refresh();
 
-    mHeartRateSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_HEART_RATE);
-    mSensorManager.registerListener(
-      this,
-      mHeartRateSensor,
-      SensorManager.SENSOR_DELAY_NORMAL
-    );
-    mGyroscopeSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-    mSensorManager.registerListener(
-      this,
-      mGyroscopeSensor,
-      SensorManager.SENSOR_DELAY_NORMAL
-    );
+    if (
+      checkSelfPermission(Manifest.permission.BODY_SENSORS) ==
+      PackageManager.PERMISSION_GRANTED
+    ) {
+      startSensors();
+    } else if (!permissionRequested) {
+      permissionRequested = true;
+      requestPermissions(
+        new String[] { Manifest.permission.BODY_SENSORS },
+        REQUEST_BODY_SENSORS
+      );
+    } else {
+      statusView.setText(R.string.sensor_permission_required);
+    }
+  }
 
-    mAccelerometerSensor =
-      mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-    mSensorManager.registerListener(
-      this,
-      mAccelerometerSensor,
-      SensorManager.SENSOR_DELAY_NORMAL
-    );
+  @Override
+  public void onRequestPermissionsResult(
+    int requestCode,
+    String[] permissions,
+    int[] grantResults
+  ) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    if (requestCode != REQUEST_BODY_SENSORS) {
+      return;
+    }
+    if (
+      grantResults.length > 0 &&
+      grantResults[0] == PackageManager.PERMISSION_GRANTED
+    ) {
+      startSensors();
+    } else {
+      statusView.setText(R.string.sensor_permission_required);
+    }
+  }
+
+  private void startSensors() {
+    if (sensorsRegistered) {
+      return;
+    }
+    sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+    if (sensorManager == null) {
+      statusView.setText(R.string.sensors_unavailable);
+      return;
+    }
+
+    heartRateSensor = sensorManager.getDefaultSensor(Sensor.TYPE_HEART_RATE);
+    gyroscopeSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+    accelerometerSensor =
+      sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+
+    boolean registered = false;
+    if (heartRateSensor != null) {
+      registered =
+        sensorManager.registerListener(
+          this,
+          heartRateSensor,
+          SensorManager.SENSOR_DELAY_NORMAL
+        ) ||
+        registered;
+    } else {
+      statusView.setText(R.string.heart_rate_unavailable);
+    }
+    if (gyroscopeSensor != null) {
+      registered =
+        sensorManager.registerListener(
+          this,
+          gyroscopeSensor,
+          SensorManager.SENSOR_DELAY_GAME
+        ) ||
+        registered;
+    }
+    if (accelerometerSensor != null) {
+      registered =
+        sensorManager.registerListener(
+          this,
+          accelerometerSensor,
+          SensorManager.SENSOR_DELAY_GAME
+        ) ||
+        registered;
+    }
+
+    if (!registered) {
+      statusView.setText(R.string.sensors_unavailable);
+      return;
+    }
+    sensorsRegistered = true;
+  }
+
+  private void stopSensors() {
+    if (sensorManager != null) {
+      sensorManager.unregisterListener(this);
+    }
+    sensorsRegistered = false;
   }
 
   @Override
   public void onSensorChanged(SensorEvent event) {
-    if (event.sensor.getType() == Sensor.TYPE_HEART_RATE) {
-      String hRate = "" + (int) event.values[0];
-      SensorType = "HR";
-      sendMessage(hRate);
+    if (event == null || event.values == null || event.values.length < 1) {
+      return;
     }
-    if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
-      final float RAD_TO_DEGREES = (float) (180.0f / Math.PI);
 
-      String gyroX = "" + (int) event.values[0] * RAD_TO_DEGREES;
-      String gyroY = "" + (int) event.values[1] * RAD_TO_DEGREES;
-      String gyroZ = "" + (int) event.values[2] * RAD_TO_DEGREES;
-      SensorType = "GYRO";
-      sendMessage(gyroX + "," + gyroY + "," + gyroZ);
-    }
-    if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-      float[] gravity = new float[3];
-      float[] linear_acceleration = new float[3];
-      final float alpha = 0.8f;
-
-      gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0];
-      gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1];
-      gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2];
-
-      linear_acceleration[0] = event.values[0] - gravity[0];
-      linear_acceleration[1] = event.values[1] - gravity[1];
-      linear_acceleration[2] = event.values[2] - gravity[2];
-
-      String accX = "" + (int) linear_acceleration[0];
-      String accY = "" + (int) linear_acceleration[1];
-      String accZ = "" + (int) linear_acceleration[2];
-      SensorType = "ACC";
-      sendMessage(accX + "," + accY + "," + accZ);
+    long now = SystemClock.elapsedRealtime();
+    switch (event.sensor.getType()) {
+      case Sensor.TYPE_HEART_RATE:
+        int bpm = Math.round(event.values[0]);
+        if (bpm <= 0 || bpm > 300) {
+          return;
+        }
+        statusView.setText(getString(R.string.heart_rate_value, bpm));
+        sender.send(String.format(Locale.US, "HR,%d", bpm));
+        break;
+      case Sensor.TYPE_GYROSCOPE:
+        if (event.values.length < 3) {
+          return;
+        }
+        if (now - lastGyroSentMs < MIN_TRANSMIT_INTERVAL_MS) {
+          return;
+        }
+        lastGyroSentMs = now;
+        sender.send(
+          String.format(
+            Locale.US,
+            "GYRO,%.3f,%.3f,%.3f",
+            Math.toDegrees(event.values[0]),
+            Math.toDegrees(event.values[1]),
+            Math.toDegrees(event.values[2])
+          )
+        );
+        break;
+      case Sensor.TYPE_ACCELEROMETER:
+        if (event.values.length < 3) {
+          return;
+        }
+        for (int axis = 0; axis < 3; axis++) {
+          gravity[axis] =
+            GRAVITY_ALPHA * gravity[axis] +
+            (1f - GRAVITY_ALPHA) * event.values[axis];
+        }
+        if (now - lastAccelSentMs < MIN_TRANSMIT_INTERVAL_MS) {
+          return;
+        }
+        lastAccelSentMs = now;
+        sender.send(
+          String.format(
+            Locale.US,
+            "ACC,%.3f,%.3f,%.3f",
+            event.values[0] - gravity[0],
+            event.values[1] - gravity[1],
+            event.values[2] - gravity[2]
+          )
+        );
+        break;
+      default:
+        break;
     }
   }
 
@@ -137,79 +215,20 @@ public class WearActivity
   public void onAccuracyChanged(Sensor sensor, int accuracy) {}
 
   @Override
-  protected void onStart() {
-    super.onStart();
-    if (!mResolvingError) {
-      mGoogleApiClient.connect();
-    }
-  }
-
-  private void resolveNode() {
-    Wearable.NodeApi
-      .getConnectedNodes(mGoogleApiClient)
-      .setResultCallback(
-        new ResultCallback<NodeApi.GetConnectedNodesResult>() {
-          @Override
-          public void onResult(NodeApi.GetConnectedNodesResult nodes) {
-            for (Node node : nodes.getNodes()) {
-              mNode = node;
-            }
-          }
-        }
-      );
+  protected void onPause() {
+    super.onPause();
+    stopSensors();
   }
 
   @Override
-  public void onConnected(Bundle bundle) {
-    resolveNode();
+  protected void onDestroy() {
+    stopSensors();
+    super.onDestroy();
   }
 
-  @Override
-  public void onConnectionSuspended(int i) {}
-
-  @Override
-  public void onConnectionFailed(ConnectionResult connectionResult) {}
-
-  public void StopHR(View view) {
-    SensorType = "None";
-    sendMessage("Disconnected");
-    mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-    mSensorManager.unregisterListener(this);
-    this.finish();
-    System.exit(0);
-  }
-
-  private void sendMessage(String Key) {
-    if (
-      mNode != null &&
-      mGoogleApiClient != null &&
-      mGoogleApiClient.isConnected()
-    ) {
-      Wearable.MessageApi
-        .sendMessage(
-          mGoogleApiClient,
-          mNode.getId(),
-          SensorType + "--" + Key,
-          null
-        )
-        .setResultCallback(
-          new ResultCallback<MessageApi.SendMessageResult>() {
-            @Override
-            public void onResult(
-              MessageApi.SendMessageResult sendMessageResult
-            ) {}
-          }
-        );
-    }
-  }
-
-  @Override
-  protected void onResume() {
-    super.onResume();
-  }
-
-  @Override
-  protected void onStop() {
-    super.onStop();
+  public void stopRecording(View view) {
+    sender.send("STOP");
+    stopSensors();
+    finish();
   }
 }
